@@ -24,8 +24,8 @@ class TrainerDataLoadingMixin(object):
         self.get_train_dataloader = model.train_dataloader
 
         # determine number of training batches
-        if isinstance(self.get_train_dataloader(), IterableDataset):
-            self.nb_training_batches = float('inf')
+        if hasattr(model.args, 'steps'):
+            self.nb_training_batches = model.args.steps
         else:
             self.nb_training_batches = len(self.get_train_dataloader())
             self.nb_training_batches = int(self.nb_training_batches * self.train_percent_check)
@@ -72,9 +72,12 @@ class TrainerDataLoadingMixin(object):
         # determine number of validation batches
         # val datasets could be none, 1 or 2+
         if self.get_val_dataloaders() is not None:
-            self.nb_val_batches = sum(len(dataloader) for dataloader in self.get_val_dataloaders())
-            self.nb_val_batches = int(self.nb_val_batches * self.val_percent_check)
-            self.nb_val_batches = max(1, self.nb_val_batches)
+            if hasattr(model.args, 'val_steps'):
+                self.nb_val_batches = model.args.val_steps
+            else:
+                self.nb_val_batches = sum(len(dataloader) for dataloader in self.get_val_dataloaders())
+                self.nb_val_batches = int(self.nb_val_batches * self.val_percent_check)
+                self.nb_val_batches = max(1, self.nb_val_batches)
 
         on_ddp = self.use_ddp or self.use_ddp2
         if on_ddp and self.get_val_dataloaders() is not None:

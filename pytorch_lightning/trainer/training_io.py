@@ -261,13 +261,19 @@ class TrainerIOMixin(ABC):
                 This points to the file that the checkpoint will be stored in.
         """
         tmp_path = str(filepath) + ".part"
-        torch.save(checkpoint, tmp_path)
-        os.replace(tmp_path, filepath)
+        if self.use_tpu:
+            xm.save(checkpoint, tmp_path, master_only=True, global_master=True)
+            if self.is_global_zero:
+                os.replace(tmp_path, filepath)
+        else:
+            torch.save(checkpoint, tmp_path)
+            os.replace(tmp_path, filepath)
 
     def save_checkpoint(self, filepath, weights_only: bool = False):
         checkpoint = self.dump_checkpoint(weights_only)
 
-        if self.is_global_zero:
+        # with self.use_tpu, processes should call `xm.save` not just the one with global_rank==0
+        if self.is_global_zero or self.use_tpu:
             # do the actual save
             try:
                 self._atomic_save(checkpoint, filepath)

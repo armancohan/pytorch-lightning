@@ -262,11 +262,8 @@ class ModelCheckpoint(Callback):
         trainer.ckpt_path = ckpt_path
         trainer.weights_save_path = ckpt_path
 
-    @rank_zero_only
     def on_validation_end(self, trainer, pl_module):
-        # only run on main process
-        if trainer.global_rank != 0:
-            return
+        # run on all process and rely on trainer.save_checkpoint to save only from the global_rank==0
 
         metrics = trainer.callback_metrics
         epoch = trainer.current_epoch
@@ -306,7 +303,7 @@ class ModelCheckpoint(Callback):
                     f'Can save best model only with {self.monitor} available, skipping.', RuntimeWarning
                 )
             elif self.check_monitor_top_k(current):
-                self._do_check_save(filepath, current, epoch)
+                self._do_check_save(trainer, filepath, current, epoch)
             elif self.verbose > 0:
                 log.info(f'\nEpoch {epoch:05d}: {self.monitor}  was not in top {self.save_top_k}')
 
@@ -314,10 +311,9 @@ class ModelCheckpoint(Callback):
             if self.verbose > 0:
                 log.info(f'\nEpoch {epoch:05d}: saving model to {filepath}')
 
-            assert trainer.global_rank == 0, 'tried to make a checkpoint from non global_rank=0'
             self._save_model(filepath)
 
-    def _do_check_save(self, filepath, current, epoch):
+    def _do_check_save(self, trainer, filepath, current, epoch):
         # remove kth
 
         del_list = []
@@ -345,6 +341,7 @@ class ModelCheckpoint(Callback):
                 f' {filepath} as top {self.save_top_k}')
         self._save_model(filepath)
 
-        for cur_path in del_list:
-            if cur_path != filepath:
-                self._del_model(cur_path)
+        if trainer.is_global_zero:
+            for cur_path in del_list:
+                if cur_path != filepath:
+                    self._del_model(cur_path)

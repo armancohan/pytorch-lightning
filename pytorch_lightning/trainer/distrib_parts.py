@@ -204,7 +204,7 @@ class TrainerDPMixin(ABC):
         if self.tpu_global_core_rank != 0 and self.progress_bar_callback is not None:
             self.progress_bar_callback.disable()
 
-        self.global_rank = self.tpu_local_core_rank
+        self.global_rank = self.tpu_global_core_rank
         rank_zero_only.rank = self.global_rank
 
         # CHOOSE OPTIMIZER

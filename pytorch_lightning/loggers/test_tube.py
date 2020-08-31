@@ -13,6 +13,13 @@ except ImportError:  # pragma: no-cover
 
 from pytorch_lightning.loggers.base import LightningLoggerBase, rank_zero_only
 
+try:
+    # To get TPU multinode global rank
+    import torch_xla.core.xla_model as xm
+except ImportError:
+    XLA_AVAILABLE = False
+else:
+    XLA_AVAILABLE = True
 
 class TestTubeLogger(LightningLoggerBase):
     r"""
@@ -115,6 +122,9 @@ class TestTubeLogger(LightningLoggerBase):
         super().save()
         # TODO: HACK figure out where this is being set to true
         self.experiment.debug = self.debug
+        # HACK: multi-node tpu
+        if XLA_AVAILABLE and xm.get_ordinal() == 0:
+            return
         self.experiment.save()
 
     @rank_zero_only

@@ -33,6 +33,7 @@ from pytorch_lightning.trainer.training_tricks import TrainerTrainingTricksMixin
 from pytorch_lightning.trainer.lr_finder import TrainerLRFinderMixin
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
 from pytorch_lightning.utilities import rank_zero_warn
+from pytorch_lightning.trainer.xla_utils import delayed_spawn
 
 
 try:
@@ -132,6 +133,7 @@ class Trainer(
             show_progress_bar=None,  # backward compatible, todo: remove in v0.9.0
             nb_sanity_val_steps=None,  # backward compatible, todo: remove in v0.8.0
             terminate_on_nan: bool = False,
+            delay_start_process: int = 0,
             **kwargs
     ):
         r"""
@@ -286,6 +288,8 @@ class Trainer(
 
             terminate_on_nan: If set to True, will terminate training (by raising a `ValueError`) at the
                 end of each training batch, if any of the parameters or the loss are NaN or +/-inf.
+
+            delay_start_process: Delay starting processes for x seconds. If 0 it won't be called
         """
 
         # Init callbacks
@@ -502,6 +506,8 @@ class Trainer(
 
         # Callback system
         self.on_init_end()
+
+        self.delay_start_process = delay_start_process
 
     @property
     def slurm_job_id(self) -> int:
@@ -757,7 +763,10 @@ class Trainer(
             self.model = model
 
             # train
-            xmp.spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method)
+            if self.delay_start_process > 0:
+                delayed_spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method, delay_start_process=self.delay_start_process)
+            else:
+                xmp.spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method)
 
             # load weights if not interrupted
             self.load_spawn_weights(model)

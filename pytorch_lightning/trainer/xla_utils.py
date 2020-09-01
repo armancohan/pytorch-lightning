@@ -1,6 +1,9 @@
-import multiprocessing
-import multiprocessing.connection
+import sys
+
 import torch.multiprocessing
+
+import torch.multiprocessing.spawn
+
 try:
     import torch_xla
     import torch_xla.core.xla_model as xm
@@ -12,18 +15,50 @@ else:
 import time
 
 from pytorch_lightning import _logger as log
+from torch.multiprocessing import _prctl_pr_set_pdeathsig
+import signal
 
+
+# Multiprocessing contexts are introduced at Python 3.4
+_supports_context = sys.version_info >= (3, 4)
+
+def _python_version_check():
+    if not _supports_context:
+        raise RuntimeError("Requires python 3.4 or higher to use "
+                           "torch.multiprocessing.spawn and "
+                           "torch.multiprocessing.ProcessContext helper "
+                           "to launch multiple processes. If you are using "
+                           "this for distributed training and have a lower "
+                           "version of python, please use "
+                           "torch.distributed.launch instead.")
+
+def _wrap(fn, i, args, error_queue):
+    # prctl(2) is a Linux specific system call.
+    # On other systems the following function call has no effect.
+    # This is set to ensure that non-daemonic child processes can
+    # terminate if their parent terminates before they do.
+    _prctl_pr_set_pdeathsig(signal.SIGINT)
+
+    try:
+        fn(i, *args)
+    except KeyboardInterrupt:
+        pass  # SIGINT; Killed by parent, do nothing
+    except Exception:
+        # Propagate exception to parent process, keeping original traceback
+        import traceback
+        error_queue.put(traceback.format_exc())
+        sys.exit(1)
 
 # Hack: modify pytorch's start_process to support delaying starting processes
 def start_delayed_processes(fn, args=(), nprocs=1, join=True, daemon=False, start_method='spawn', delay=0):
-    torch.multiprocessing._python_version_check()
-    mp = multiprocessing.get_context(start_method)
+    _python_version_check()
+    mp = torch.multiprocessing.get_context(start_method)
     error_queues = []
     processes = []
     for i in range(nprocs):
         error_queue = mp.SimpleQueue()
         process = mp.Process(
-            target=torch.multiprocessing._wrap,
+            target=_wrap,
             args=(fn, i, args, error_queue),
             daemon=daemon,
         )

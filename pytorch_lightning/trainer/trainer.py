@@ -764,7 +764,7 @@ class Trainer(
 
             # train
             if self.delay_start_process > 0:
-                delayed_spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method, delay_start_process=self.delay_start_process)
+                delayed_spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method, delay=self.delay_start_process)
             else:
                 xmp.spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method)
 

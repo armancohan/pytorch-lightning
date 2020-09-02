@@ -160,6 +160,9 @@ from pytorch_lightning.trainer.supporters import TensorRunningAccum
 from pytorch_lightning.utilities import rank_zero_warn
 from pytorch_lightning.utilities import memory_utils
 
+from pytorch_lightning.trainer.xla_utils import DelayedParallelLoader
+import gc
+
 try:
     from apex import amp
 except ImportError:
@@ -382,7 +385,7 @@ class TrainerTrainLoopMixin(ABC):
             self.run_training_teardown()
 
     def run_training_epoch(self):
-
+        gc.collect()
         # get model
         model = self.get_model()
 
@@ -398,7 +401,7 @@ class TrainerTrainLoopMixin(ABC):
         # on TPU we have to wrap it under the ParallelLoader
         if self.use_tpu:
             device = xm.xla_device()
-            parallel_loader = xla_pl.ParallelLoader(self.train_dataloader, [device])
+            parallel_loader = DelayedParallelLoader(self.train_dataloader, [device], loader_prefetch_size=8, delay=self.delay_start_process)
             _dataloader = parallel_loader.per_device_loader(device)
         else:
             _dataloader = self.train_dataloader
@@ -491,6 +494,7 @@ class TrainerTrainLoopMixin(ABC):
             # need to destroy the parallel_loader to avoid shared memory leaks
             parallel_loader.close()
             del parallel_loader
+            gc.collect()
 
         # process epoch outputs
         model = self.get_model()

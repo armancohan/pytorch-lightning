@@ -135,6 +135,9 @@ from pytorch_lightning.overrides.data_parallel import LightningDistributedDataPa
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
 from pytorch_lightning.utilities import rank_zero_warn
 
+from pytorch_lightning.trainer.xla_utils import DelayedParallelLoader
+import gc
+
 try:
     import torch_xla.distributed.parallel_loader as xla_pl
     import torch_xla.core.xla_model as xm
@@ -246,12 +249,13 @@ class TrainerEvaluationLoopMixin(ABC):
 
         # run validation
         for dataloader_idx, dataloader in enumerate(dataloaders):
+            gc.collect()
             dl_outputs = []
 
             # on TPU we have to wrap it under the ParallelLoader
             if self.use_tpu:
                 device = xm.xla_device()
-                parallel_dataloader = xla_pl.ParallelLoader(dataloader, [device])
+                parallel_dataloader = DelayedParallelLoader(dataloader, [device], delay=self.delay_start_process)
                 _dataloader = parallel_dataloader.per_device_loader(device)
             else:
                 _dataloader = dataloader
@@ -301,6 +305,7 @@ class TrainerEvaluationLoopMixin(ABC):
             if self.use_tpu:
                 parallel_dataloader.close()
                 del parallel_dataloader
+                gc.collect()
 
         eval_results = {}
 

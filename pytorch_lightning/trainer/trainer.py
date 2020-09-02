@@ -759,11 +759,15 @@ class Trainer(
             #  COLAB_GPU is an env var available by default in Colab environments.
             start_method = 'fork' if os.getenv('COLAB_GPU') or os.getenv('KAGGLE_URL_BASE') else 'spawn'
 
+            # TODO: We always use `fork`, it results in lower VM memory
+            start_method = 'fork'
+
             # track for predict
             self.model = model
 
             # train
             if self.delay_start_process > 0:
+                # delay spawning processes
                 delayed_spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method, delay=self.delay_start_process)
             else:
                 xmp.spawn(self.tpu_train, args=(model,), nprocs=self.num_tpu_cores, start_method=start_method)

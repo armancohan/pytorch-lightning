@@ -123,7 +123,7 @@ class TestTubeLogger(LightningLoggerBase):
         # TODO: HACK figure out where this is being set to true
         self.experiment.debug = self.debug
         # HACK: multi-node tpu
-        if XLA_AVAILABLE and xm.get_ordinal() == 0:
+        if XLA_AVAILABLE and xm.get_ordinal() != 0:
             return
         self.experiment.save()
 

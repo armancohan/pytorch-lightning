@@ -350,6 +350,10 @@ class TrainerTrainLoopMixin(ABC):
                     window_length=self.accumulate_grad_batches
                 )
 
+                if self.use_tpu and XLA_AVAILABLE:
+                    xm.rendezvous('begin_epoch')  # wait for all workers
+                    xm.mark_step()
+
                 # -----------------
                 # RUN TNG EPOCH
                 # -----------------
@@ -401,6 +405,8 @@ class TrainerTrainLoopMixin(ABC):
         # on TPU we have to wrap it under the ParallelLoader
         if self.use_tpu:
             device = xm.xla_device()
+            xm.rendezvous("tpu_data_loader")  # wait for all workers
+            xm.mark_step()
             parallel_loader = DelayedParallelLoader(self.train_dataloader, [device], loader_prefetch_size=8, delay=self.delay_start_process)
             _dataloader = parallel_loader.per_device_loader(device)
         else:
@@ -459,6 +465,9 @@ class TrainerTrainLoopMixin(ABC):
                 self.run_evaluation(test_mode=self.testing)
                 self.call_checkpoint_callback()
                 self.call_early_stop_callback()
+                if self.use_tpu and XLA_AVAILABLE:
+                    xm.rendezvous('tr_loop-checkpoint_saved')
+                    xm.mark_step()
 
             # when logs should be saved
             should_save_log = (batch_idx + 1) % self.log_save_interval == 0 or early_stop_epoch
@@ -644,6 +653,10 @@ class TrainerTrainLoopMixin(ABC):
 
                     # reset for next set of accumulated grads
                     self.batch_loss_value.reset()
+                else:
+                    if self.use_tpu and XLA_AVAILABLE:
+                        # mark step here for every forward pass without a backward pass to prevent oom
+                        xm.mark_step()
 
         # Batch end events
         with self.profiler.profile('on_batch_end'):

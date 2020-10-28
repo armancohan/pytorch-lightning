@@ -467,10 +467,10 @@ class TrainerTrainLoopMixin(ABC):
                     xm.rendezvous('tr_loop-entering checkpoint callback')
                 self.call_checkpoint_callback()
                 self.call_early_stop_callback()
-                if self.use_tpu and XLA_AVAILABLE:
-                    xm.rendezvous('tr_loop-checkpoint_saved')
-                    xm.mark_step()
-                    xm.master_print('saved checkpoint')
+            if self.use_tpu and XLA_AVAILABLE:
+                xm.rendezvous('tr_loop-checkpoint_saved')
+                xm.mark_step()
+                xm.master_print('saved checkpoint')
 
             # when logs should be saved
             should_save_log = (batch_idx + 1) % self.log_save_interval == 0 or early_stop_epoch

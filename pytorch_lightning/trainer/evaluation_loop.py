@@ -257,7 +257,7 @@ class TrainerEvaluationLoopMixin(ABC):
                 device = xm.xla_device()
                 xm.rendezvous("tpu_data_loader")  # wait for all workers
                 xm.mark_step()
-                parallel_dataloader = DelayedParallelLoader(dataloader, [device], delay=self.delay_start_process)
+                parallel_dataloader = xla_pl.ParallelLoader(dataloader, [device])
                 _dataloader = parallel_dataloader.per_device_loader(device)
             else:
                 _dataloader = dataloader

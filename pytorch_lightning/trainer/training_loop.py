@@ -186,6 +186,30 @@ else:
     HOROVOD_AVAILABLE = True
 
 
+def get_rank():
+    """returns the global rank, and -1 if not distributed"""
+    if XLA_AVAILABLE:
+        global_rank = xm.get_ordinal()
+    else:
+        try:
+            global_rank = torch.distributed.get_rank()
+        except:
+            # not distributed
+            global_rank = -1
+
+    return global_rank
+
+
+def _log(message, master_only=True):
+    rank = get_rank()
+    if not master_only:
+        if rank % 8 == 0:
+            print(f"{rank}, {message}")
+    else:
+        if rank == 0:
+            print(f"{rank}, {message}")
+
+
 class TrainerTrainLoopMixin(ABC):
 
     # this is just a summary on variables used in this abstract class,
@@ -462,9 +486,14 @@ class TrainerTrainLoopMixin(ABC):
             # ---------------
             # fast_dev_run always forces val checking after train batch
             if self.fast_dev_run or should_check_val:
+                if self.use_tpu and XLA_AVAILABLE:
+                    xm.rendezvous('tr_loop-entering evaluation')                
                 self.run_evaluation(test_mode=self.testing)
+                if self.use_tpu and XLA_AVAILABLE:
+                    xm.rendezvous('tr_loop-entering checkpoint callback')                
                 self.call_checkpoint_callback()
                 self.call_early_stop_callback()
+                _log('evaluation/checkpointing finished')
 
             # when logs should be saved
             should_save_log = (batch_idx + 1) % self.log_save_interval == 0 or early_stop_epoch

@@ -354,7 +354,10 @@ class TrainerTrainLoopMixin(ABC):
 
         try:
             # run all epochs
+            initial_epoch_number = self.current_epoch
             for epoch in range(self.current_epoch, self.max_epochs):
+                # get the epoch number after restore
+                self.current_epoch_after_restore = epoch - initial_epoch_number
                 # reset train dataloader
                 if self.reload_dataloaders_every_epoch:
                     self.reset_train_dataloader(model)
@@ -445,8 +448,10 @@ class TrainerTrainLoopMixin(ABC):
         for batch_idx, (batch, is_last_batch) in self.profiler.profile_iterable(
             enumerate(_with_is_last(_dataloader)), "get_train_batch"
         ):
-            if self.num_skip_batches is not None and batch_idx < self.num_skip_batches:
-                print(f'skipping batch {batch_idx} in epoch {self.current_epoch}')
+            if self.num_skip_batches is not None \
+                    and batch_idx < self.num_skip_batches \
+                    and self.current_epoch_after_restore == 0:
+                _log(f'skipping batch {batch_idx}')
                 continue
             # stop epoch if we limited the number of training batches
             if batch_idx >= self.num_training_batches:
@@ -505,14 +510,14 @@ class TrainerTrainLoopMixin(ABC):
             if should_save_log or self.fast_dev_run:
                 if self.proc_rank == 0 and self.logger is not None:
                     self.logger.save()
-            _log(f'done saving logs {batch_idx}')
+                _log(f'done saving logs {batch_idx}')
 
             # when metrics should be logged
             should_log_metrics = batch_idx % self.row_log_interval == 0 or early_stop_epoch
             if should_log_metrics or self.fast_dev_run:
                 # logs user requested information to logger
                 self.log_metrics(batch_step_metrics, grad_norm_dic)
-            _log(f'done saving metrics {batch_idx}')                
+                _log(f'done saving metrics {batch_idx}')                
 
             # progress global step according to grads progress
             if (self.batch_idx + 1) % self.accumulate_grad_batches == 0:

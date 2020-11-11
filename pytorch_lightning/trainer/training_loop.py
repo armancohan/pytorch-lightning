@@ -510,14 +510,12 @@ class TrainerTrainLoopMixin(ABC):
             if should_save_log or self.fast_dev_run:
                 if self.proc_rank == 0 and self.logger is not None:
                     self.logger.save()
-                _log(f'done saving logs {batch_idx}')
 
             # when metrics should be logged
             should_log_metrics = batch_idx % self.row_log_interval == 0 or early_stop_epoch
             if should_log_metrics or self.fast_dev_run:
                 # logs user requested information to logger
                 self.log_metrics(batch_step_metrics, grad_norm_dic)
-                _log(f'done saving metrics {batch_idx}')                
 
             # progress global step according to grads progress
             if (self.batch_idx + 1) % self.accumulate_grad_batches == 0:

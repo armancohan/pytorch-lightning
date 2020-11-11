@@ -134,6 +134,7 @@ class Trainer(
             nb_sanity_val_steps=None,  # backward compatible, todo: remove in v0.8.0
             terminate_on_nan: bool = False,
             delay_start_process: int = 0,
+            num_skip_batches=None,
             **kwargs
     ):
         r"""
@@ -508,6 +509,7 @@ class Trainer(
         self.on_init_end()
 
         self.delay_start_process = delay_start_process
+        self.num_skip_batches = num_skip_batches
 
     @property
     def slurm_job_id(self) -> int:

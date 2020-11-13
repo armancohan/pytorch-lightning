@@ -132,7 +132,7 @@ def delayed_spawn(fn,
 
 
 
-class DelayedParallelLoader(xloader.ParallelLoader):
+class DelayedParallelLoader(xloader.ParallelLoader if XLA_AVAILABLE else object):
   """Wraps an existing PyTorch DataLoader with background data upload.
   Args:
     loader (:class:`torch.utils.data.DataLoader`): The PyTorch DataLoader to be
@@ -183,3 +183,17 @@ class DelayedParallelLoader(xloader.ParallelLoader):
       thread.start()
       if delay > 0:
         time.sleep(delay)
+
+
+def tpu_data_loader():
+    import torch_xla.core.xla_model as xm
+    import torch_xla.distributed.parallel_loader as pl
+
+    xm.rendezvous("tpu_data_loader")  # wait for all workers
+    xm.mark_step()
+    device = xm.xla_device()
+    return iterators.CountingIterator(
+        pl.ParallelLoader(itr, [device]).per_device_loader(device),
+        start=getattr(itr, "n", 0),
+        total=len(itr),
+    )

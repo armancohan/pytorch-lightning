@@ -206,7 +206,7 @@ def _log(message, master_only=True):
         if rank % 8 == 0:
             print(f"{rank}, {message}")
     else:
-        if rank == 0:
+        if rank in [0, -1]:
             print(f"{rank}, {message}")
 
 

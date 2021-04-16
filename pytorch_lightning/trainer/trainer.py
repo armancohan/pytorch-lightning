@@ -624,6 +624,8 @@ class Trainer(
                 for k, v in result.items():
                     if isinstance(v, torch.Tensor):
                         result[k] = v.cpu().item()
+                    elif isinstance(v, torch.Tensor) and len (v.shape) > 0:
+                        result[k] = v.cpu().numpy()
 
         return eval_loop_results
 

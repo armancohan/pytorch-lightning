@@ -622,7 +622,7 @@ class Trainer(
         for i, result in enumerate(eval_loop_results):
             if isinstance(result, dict):
                 for k, v in result.items():
-                    if isinstance(v, torch.Tensor) and len (v.shape) > 0:
+                    if isinstance(v, torch.Tensor) and len (v.shape) == 0:
                         result[k] = v.cpu().item()
                     elif isinstance(v, torch.Tensor) and len (v.shape) > 0:
                         result[k] = v.cpu().numpy()
